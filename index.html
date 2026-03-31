@@ -132,7 +132,7 @@ select.input{appearance:auto}
 // Set these ONCE before sharing the file with customers.
 // These are embedded in the file and used by all customers.
 const CONFIG = {
-  SHEET_URL: 'https://script.google.com/macros/s/AKfycbx3-guwsRbJS8JoapdnjJD0oLISMbnDuKTt-pbYgpNKZ0vNtjFnrmZKAoyEU3rYVLXV/exec',         // Your Google Apps Script URL, e.g. 'https://script.google.com/macros/s/.../exec'
+  SHEET_URL: 'https://script.google.com/macros/s/AKfycbwhprqx8kWD3val7fJhwmxjTZJhJxLC8G52XTXvN7iXkJNdk03TFQZsj6ZzwTrMAQVd/exec',         // Your Google Apps Script URL, e.g. 'https://script.google.com/macros/s/.../exec'
   SHEET_TOKEN: 'mango2026',       // Must match SECRET_TOKEN in your Apps Script, e.g. 'mango2026'
   VENDOR_NAME: 'Fresh Veggie Farm',
   VENDOR_PHONE: '919773088004',      // With country code, e.g. '919876543210'
@@ -2022,7 +2022,7 @@ function fetchSettingsFromSheet() {
         if (s.vendorPhone && s.vendorPhone !== settings.vendorPhone) { settings.vendorPhone = s.vendorPhone; changed = true; }
         if (s.upiId && s.upiId !== settings.upiId) { settings.upiId = s.upiId; changed = true; }
         if (s.welcomeMessage && s.welcomeMessage !== settings.welcomeMessage) { settings.welcomeMessage = s.welcomeMessage; changed = true; }
-        if (s.adminPin && ADMIN_ENABLED && s.adminPin !== settings.pin) { settings.pin = s.adminPin; changed = true; }
+        if (s.adminPin && CONFIG.ADMIN_ENABLED && s.adminPin !== settings.pin) { settings.pin = s.adminPin; changed = true; }
         if (changed) {
           saveData(STORAGE_KEYS.settings, settings);
           render();
@@ -2051,10 +2051,67 @@ function pushSettingsToSheet() {
   }).catch(function() {});
 }
 
+// ============ ADMIN ORDERS SYNC ============
+
+function fetchAdminOrdersFromSheet() {
+  if (!CONFIG.SHEET_URL || !CONFIG.ADMIN_ENABLED) return;
+  var url = CONFIG.SHEET_URL + '?token=' + encodeURIComponent(CONFIG.SHEET_TOKEN) + '&action=admin-orders';
+  fetch(url)
+    .then(function(resp) { return resp.json(); })
+    .then(function(data) {
+      if (data.status === 'success' && data.orders && data.orders.length > 0) {
+        // Merge Sheet orders into local orders list.
+        // Sheet is the source of truth — add any orders not already in localStorage,
+        // and update payment/notified status for existing ones.
+        var localById = {};
+        orders.forEach(function(o) { localById[o.id] = o; });
+
+        var changed = false;
+        data.orders.forEach(function(so) {
+          var local = localById[so.id];
+          if (!local) {
+            // New order from Sheet that we don't have locally
+            orders.push({
+              id: so.id,
+              customerName: so.customerName,
+              customerPhone: so.customerPhone,
+              items: so.items.map(function(it) {
+                return { id: 0, name: it.name, qty: it.qty, unit: it.unit, price: it.price, amount: it.amount };
+              }),
+              total: so.total,
+              status: 'confirmed',
+              paymentStatus: so.paymentStatus || 'unpaid',
+              notified: so.notified || false,
+              createdAt: so.createdAt || new Date().toISOString()
+            });
+            changed = true;
+          } else {
+            // Update status if Sheet has newer info
+            if (so.paymentStatus && so.paymentStatus !== local.paymentStatus) {
+              local.paymentStatus = so.paymentStatus;
+              changed = true;
+            }
+            if (so.notified && !local.notified) {
+              local.notified = true;
+              changed = true;
+            }
+          }
+        });
+
+        if (changed) {
+          persist();
+          render();
+        }
+      }
+    })
+    .catch(function() {});
+}
+
 // ============ INIT ============
 render();
 fetchMenuFromSheet();
 fetchSettingsFromSheet();
+fetchAdminOrdersFromSheet();
 </script>
 </body>
 </html>
