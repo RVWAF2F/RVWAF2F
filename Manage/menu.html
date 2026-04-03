@@ -1938,7 +1938,7 @@ function buildMenuWhatsAppMessage() {
   let msg = `*${settings.vendorName} - Weekly Menu*\n`;
   msg += `${settings.welcomeMessage}\n\n`;
   for (const [cat, items] of Object.entries(grouped)) {
-    msg += `*${getCategoryEmoji(cat)} ${cat}*\n`;
+    msg += `*${getCategoryEmojiText(cat)} ${cat}*\n`;
     items.forEach(item => {
       msg += `  ${item.name} - ${formatCurrency(item.price)}/${item.unit}\n`;
     });
@@ -1950,6 +1950,7 @@ function buildMenuWhatsAppMessage() {
 
 // ============ HELPERS ============
 
+// HTML entity emojis (for rendering in the page)
 function getCategoryEmoji(cat) {
   const emojis = {
     'Leafy Greens': '&#129388;',
@@ -1958,6 +1959,17 @@ function getCategoryEmoji(cat) {
     'Others': '&#127813;'
   };
   return emojis[cat] || '&#127813;';
+}
+
+// Unicode emojis (for WhatsApp messages and plain text)
+function getCategoryEmojiText(cat) {
+  var emojis = {
+    'Leafy Greens': '\uD83E\uDD6C',
+    'Root Vegetables': '\uD83E\uDD54',
+    'Gourds': '\uD83E\uDD52',
+    'Others': '\uD83C\uDF4D'
+  };
+  return emojis[cat] || '\uD83C\uDF4D';
 }
 
 function attachEventListeners() {
